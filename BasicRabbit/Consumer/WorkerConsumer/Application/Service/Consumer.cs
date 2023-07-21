@@ -6,7 +6,7 @@ public class Consumer : IConsumer
     {
            
     }
-    string queueName = "rabbit_poc";
+    const string queueName = "rabbit_poc";
     public Task ConsumerChannel()
     {
         try
@@ -34,7 +34,6 @@ public class Consumer : IConsumer
 
             chanel.BasicConsume(queue: queueName, autoAck: true, consumer: consumer);
 
-            Console.ReadLine();
         }
         catch (Exception ex)
         {

@@ -20,13 +20,12 @@ public static class PublishChanel
 
             chanel.QueueDeclare(queue: queueName, durable: false, exclusive: false, autoDelete: false, arguments: null);
 
-            Console.WriteLine("Por favor digite a mensagem");
-            string mensagem = Console.ReadLine();
+            Console.WriteLine("Por favor digite a mensagem: ");
 
             chanel.BasicPublish(exchange: "",
                                                      routingKey: queueName,
                                                      basicProperties: null,
-                                                     body: Encoding.UTF8.GetBytes(mensagem));
+                                                     body: Encoding.UTF8.GetBytes(Console.ReadLine()));
 
         }
         catch (Exception ex)
