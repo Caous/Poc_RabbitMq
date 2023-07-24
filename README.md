@@ -1,49 +1,51 @@
 # RabbitMq
 
-Projeto com objetivo em mostrar a implementação do Redis, uma ferramenta muito utilizada para cache mas também com outros recursos que você não sabia.
+Projeto com objetivo em mostrar a implementação do RabbitMq, uma ferramenta muito utilizada para cache mas também com outros recursos que você não sabia.
 
-![MediatR](https://linuxiac.b-cdn.net/wp-content/uploads/2021/06/redis-how-it-works.png)
+![RabbitMq](https://www.luisdev.com.br/wp-content/uploads/2021/01/mesageria-service-bus-1.png) </br><p>Imagem de direito autoral do <a href="https://www.luisdev.com.br" target="_blank"> Luis Dev </a> </p>
 
 
 
 ### <h2>Fala Dev, seja muito bem-vindo
-   Está POC é para mostrar como podemos implementar o <b>Redis</b> em diversos projetos, com adaptação para o cenário que você precisa, juntamente mostrando outros serviços dentro do próprio Redis, também te explico <b>o que é o Redis</b> e como usar em diversas situações. Espero que encontre o que procura. <img src="https://media.giphy.com/media/WUlplcMpOCEmTGBtBW/giphy.gif" width="30"> 
+   Está POC é para mostrar como podemos implementar o <b>RabbitMq</b> em diversos projetos, com adaptação para o cenário que você precisa, também te explico <b>o que é o RabbitMq</b> e como usar. Espero que encontre o que procura. <img src="https://media.giphy.com/media/WUlplcMpOCEmTGBtBW/giphy.gif" width="30"> 
 </em></p></h5>
   
   </br>
   
 
 
-<img align="right" src="https://redis.com/wp-content/uploads/2023/04/mkt-13879-caching-framework-diagrams-RI-CDC-01.png" width="500" height="400"/>
+<img align="right" src="https://blog.zenika.com/wp-content/uploads/2012/03/RabbitMQ-1.jpg" width="450" height="375"/>
 
 
 </br></br>
 
-### <h2>Redis <a href="https://redis.io/docs/" target="_blank"><img alt="Redis" src="https://img.shields.io/badge/Redis-blue?style=flat&logo=google-chrome"></a>
+### <h2>RabbitMq <a href="https://www.rabbitmq.com/tutorials/tutorial-one-dotnet.html" target="_blank"><img alt="RabbitMq" src="https://img.shields.io/badge/rabbitmq-blue?style=flat&logo=google-chrome"></a>
 
- <a href="https://redis.io/" target="_blank">Redis </a> armazenamento de dados em memória, de código aberto usado por milhões de desenvolvedores, cache, mecanismo de streaming, Menssage Broker e muito mais. Redis é uma ótima alternativa para diversos projetos, trabalhar com cache é uma necessidade de diversos sistemas e hoje uma das ferramentas mais queridas do mercado, utilizada para fazer cache distribuido principalmente para aplicações com grande escalonamento por exemplo Micro Serviço, o <b>redis normalmente é usado para manipular o Cache nesse tipo de sistema</b>.
+ <a href="https://www.rabbitmq.com/" target="_blank">RabbitMq </a> um Message Broker você deve ter ouvido esta palavra em algum lugar, caso nunca tenha ouvido, também não tem problema porque vou te explicar agora. Um Message Broker é responsável por controlar e reter todas as mensagens que trafegam entre aplicações, normalmente usados para comunicação entre microsserviços e filas. Desta forma ele recebe uma mensagem, retem e qualquer aplicação que tiver interesse consome a mensagem. Normlamente existe uma estrutura de fila que se baseia em alguns pilares, vamos abordar como são esses pilares para o RabbitMq.</b>.
  
-<b>Objetivo:</b> uma ferramenta Open Source, ou seja, uma ferramenta de código-fonte aberto, popularmente conhecido como uma ferramenta de <b>cache em memória</b>, com diversos recursos para salvar dados temporariamente, ele se destaca por manter seus dados de cache armazenados em momória, diferente de muitos outros que é no disco rígido, o Redis também contem alguns serviços inclusos que algumas pessoas desconhecem, sendo muito útil para outras funções como:
-   <br>
-   <b>Menssage Broke</b><br>
-   <b>Submit/Publish</b><br>
-   <b>Transactions</b>.
-   
-   Vamos <b>pontuar apenas dois tópicos dos serviços que o Redis oferece, Pub/Sub e Cache</b>. Vamos focar no objetivo de cada um, com sua vantagem e desvantagem.
+<b>Objetivo:</b> O RabbitMq foi criado para suporta o trafego de mensagem entre linguagens, sendo assim ele utiliza o protocolo de comunicação AMQP, MQTT, STOMP,HTTP. Para conseguir transportar e enviar mensagens de um sistema o outro. Mas não se engane o RabbitMq apenas retém as mensagens ele não envia ou vai buscar mensagem.
   
   
-   <b>[Cache]</b> Redis consegue armanezar os dados em memória possibilitando que você consiga ter acesso as informações de forma mais rápida, por sua estrutura ser <b>cache distribuídos</b> outras aplicações podem acessar a mesma informação, muito utilizado hoje em dia em <b>aplicações que estão em containers com docker e kubernets</b>, onde temos diversas instâncias virtuais daquele servidor, também dependendo da sua utilização é possível tirar <b>snapshots para armazenar os dados em disco</b>. Este tipo de cache pode melhorar a performance da aplicação, além de facilitar a sua escalabilidade. Quando se trabalha com cache distribuído, o dado:
+**Linguagem:** Erlang.
 
- - É coerente (consistente) entre as requisições pelos vários servidores da aplicação;
- - Não se perde se a aplicação reiniciar;
- - Memorial local é configurável.
- - Velocidade de resposta
- - Configurações que permitem você deixar o cachê dinâmico para armezar (Tempo de armazenamento, snapshots, objetos duplicados...)
-  
+**Mensageria:** Enfileiramento de mensagens de forma assync o conceito do Rabbit é muito semelhante a fila utilizado em estrutura de dados, o padrão que o RabbitMq pode utilizar é publish/subcribe (pub/sub) mas por ser um menssage broker ele já detém um maneira de fila bem **resiliente**.
+
+**Pilares:** 
+
+- **Publish**
+Publish sempre será aquele que vai enviar a mensagem para a Exchange, onde ele notifica e depois disso não precisa se preocupar com o resto para frente, mas o fluxo é Publish publica a mensagem vai para a exchange, da exchange para o Queue e depois o Consumer lê a mensagem.
+- **Queue**
+São as filas que vão ter as mensagens, eles são responsáveis por receber as mensagens e deixar elas disponíveis.
+- **Consumer**
+O Consumer é responsável por ficar ouvindo o Queue e sempre que aparecer uma mensagem no qual o Consumer está inscrito ele vai consumir a mensagem.
+- **Exchange**
+A exchange sempre será responsável por enviar os dados para uma fila quando estamos falando de mensage broker, temos 4 tipos de exchange, utilizando atributos de cabeçalho, routing keys, ou bindings.
+**Direct:** Ele é responsável por enviar a mensagem para todas as filas, uma diferenciação é que através de Routing Key o exchange vai saber para onde enviar a mensagem, para qual fila.
+**Fanout:** O Fanout é um tipo de fila que ao receber a mensagem vai enviar a mensagem para todas as filas.
+**Topic:** Normalmente uma Exchange mais flexível, quando temos uma mensagem com algum tipo de padrão da Router Key, conseguimos fazer regras para enviar de forma flexível as mensagens, podendo enviar para N filas ou específica.
+**Headers**
    
-<b>[Pub/Sub]</b> SUBSCRIBE, UNSUBSCRIBE e PUBLISH este é um padrão de projeto arquitetural para mensagens Publicar/Assinar onde remetentes não são programados para enviar suas mensagens para receptores específicos (assinantes). Ou seja quem publica a mensagem não quer saber quem vai consumir, ele apenas deixa em um local disponível, caracterizados em canais (Chanel), sem conhecimento de quais assinantes podem existir. Os assinantes manifestam interesse em um ou mais canais e só recebem mensagens de seu interesse, sem saber quais (se houver) editores existem. Este padrão é muito usado e simples para comunicações, mas deve-se atentar alguns pontos, se a biblioteca que estiver usando não for configuravel, você pode perder suas mensagens depois de um certo tempo, além disso não existe uma fila esses pontos podem ser classificados como negativos se sua aplicação está preparada para trabalhar com fila.
-   
-Legal né? Mas agora a pergunta é como posso usar o Redis? Abaixo dou um exemplo de caso de uso.
+Legal né? Mas agora a pergunta é como posso usar o RabbitMq? Abaixo dou um exemplo de caso de uso.
 
 </br></br>
 
