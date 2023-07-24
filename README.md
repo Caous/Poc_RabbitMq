@@ -50,27 +50,18 @@ Legal né? Mas agora a pergunta é como posso usar o RabbitMq? Abaixo dou um exe
 </br></br>
 
 ### <h2>[Cenário de Uso]
-Vamos imaginar o seguinte cenário, você tem uma API Rest <b>que gerencia seu cliente</b>, desta forma, você precisa fazer várias manipulações com seu cliente, como <b>alterar, cadastrar, excluir, listar, filtrar etc...</b> Alem deste fator de manipular o cliente, vamos precisar precisa que nossa API notifique outro sistema sempre que cadastrar um usuário novo, sendo assim oque você vai precisar fazer é sua API notificar o Canal que ela está inscrita e o aplicação do outro lado receber a notificação.
+Vamos imaginar o seguinte cenário, você tem uma API Rest <b>que precisa notificar</b> uma aplicação, mas o volume é enorme que chegará nesta outra aplicação, então para não termos o risco de sobrecarregar a outra aplicação com o volume de solicitação, então vamos publicar em uma fila as notificações e deixar disponível. Para a outra aplicação processar conforme ela pegar no canal.
 
    
-## <h2> Primeiro passo vamos colocar o Redis em um container
+## <h2> Primeiro passo vamos colocar o RabbitMq em um container criando o usuário
    
    Execute o comando abaixo no seu promt de comando
    
    ````
-   docker run --name local-redis -p 6379:6379 -d redis
+   $ docker run -d --hostname my-rabbit --name some-rabbit -e RABBITMQ_DEFAULT_USER=user -e RABBITMQ_DEFAULT_PASS=password -p 8080:15672 rabbitmq:3-management
    ````
    
-   Agora execute o redis e abra sua interface para criarmos um canal
-   ````
-   docker exec -it local-redis redis-cli
-   ````
-   
-   Para criar uma chave com um valor:
-   
-   ````
-   127.0.0.1:6379> SET “customer-redis" “Welcome to redis”
-   ````
+   Agora execute o RabbitMq e execute através da interface do Docker hub
    
    ### <h2> Criando nosso appsetings.json
    
