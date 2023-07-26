@@ -63,234 +63,159 @@ Vamos imaginar o seguinte cenário, você tem uma API Rest <b>que precisa notifi
    
    Agora execute o RabbitMq e execute através da interface do Docker hub
    
-   ### <h2> Criando nosso appsetings.json
-   
-   ```Json
-   {
-      "Logging": {
-         "LogLevel": {
-         "Default": "Information",
-         "Microsoft.AspNetCore": "Warning"
-         }
-      },
-  "AllowedHosts": "*",
-  "Redis": {
-    "ConnectionString": "localhost:6379",
-    "Chanel": "customer-redis"
-      }
-   }
+   ### <h2> Agora vamos criar o Projeto Console.Application para postar a mensagem na fila
 
-   ```
-   
-   
-### <h2> Criação de Classes
-
-Vamos criar a classe que será responsável por conectar ao canal e configurar o cache.
-```C#
-public interface ICachingService
+   Primeiro vamos criar a classe que se conecta na fila e em seguida posta na fila
+   ```C#
+   public static class PublishChanel
 {
-    Task SetAsync(string Key, string value);
-    Task<string> GetAsync(string Key);
+
+    public static void Publisher()
+    {
+
+        string queueName = "rabbit_poc";
+        try
+        {
+            var factory = new ConnectionFactory()
+            {
+                HostName = "localhost"
+            };
+
+            using var connection = factory.CreateConnection();
+
+            using var chanel = connection.CreateModel();
+
+            chanel.QueueDeclare(queue: queueName, durable: false, exclusive: false, autoDelete: false, arguments: null);
+
+            Console.WriteLine("Por favor digite a mensagem: ");
+
+            chanel.BasicPublish(exchange: "",
+                                                     routingKey: queueName,
+                                                     basicProperties: null,
+                                                     body: Encoding.UTF8.GetBytes(Console.ReadLine()));
+
+        }
+        catch (Exception ex)
+        {
+
+            Console.WriteLine("error: " + ex.Message);
+        }
+    }
+
+
 }
+   ```
+   Vamos configurar o Program.Cs para executar essa classe
+
+   ```C#
+   PublishChanel.Publisher();
+   ```
+### <h2> Criação o projeto Consumer que irá consumir as mensagens postadas na fila, esse projeto é um WorkService
+
+Vamos primeiro criar a interface para utilizarmos via injeção de dependência.
+```C#
+public interface IConsumer
+{
+    Task ConsumerChannel();
+}
+
 ```
 
 Próxima etapa será implementar está interface
 ```C#
 
-public class CachingService : ICachingService
+public class Consumer : IConsumer
 {
-    private readonly IDistributedCache _cache;
-    private readonly DistributedCacheEntryOptions _options;
-
-    public CachingService(IDistributedCache cache)
+    public Consumer()
     {
-        _cache = cache;
-        _options = new DistributedCacheEntryOptions
+           
+    }
+    const string queueName = "rabbit_poc";
+    public Task ConsumerChannel()
+    {
+        try
         {
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(120),
-            SlidingExpiration = TimeSpan.FromSeconds(120)
-        };
-    }
-    public async Task<string> GetAsync(string key)
-    {
-        return await _cache.GetStringAsync(key);
-    }
+            var factory = new ConnectionFactory()
+            {
+                HostName = "localhost"
+            };
 
-    public async Task SetAsync(string key, string value)
-    {
-        await _cache.SetStringAsync(key, value, _options);
+            using var connection = factory.CreateConnection();
+
+            using var chanel = connection.CreateModel();
+
+            chanel.QueueDeclare(queue: queueName, durable: false, exclusive: false, autoDelete: false, arguments: null);
+
+            var consumer = new EventingBasicConsumer(chanel);
+
+            consumer.Received += (sender, args) =>
+            {
+                var body = args.Body.ToArray();
+                var message = Encoding.UTF8.GetString(body);
+                Console.WriteLine($"Mensagem recebida: {message}");
+
+            };
+
+            chanel.BasicConsume(queue: queueName, autoAck: true, consumer: consumer);
+
+        }
+        catch (Exception ex)
+        {
+
+            Console.WriteLine("error: " + ex.Message);
+        }
+
+        return Task.CompletedTask;
     }
 }
 
 ```
 </br>
 
-Vamos também aproveitar e criar nossa classe que irá fazer o Publish no canal
+Vamos agora configurar nossa classe Worker.cs para chamar o método de consumir mensagem na fila
 ```C#
-using StackExchange.Redis;
-
-namespace PocWebCacheRedis.Infrastructure.Publish;
-public class PublishCustomer
+public class Worker : BackgroundService
 {
-    private readonly IConfiguration _configuration;
-    private static ConnectionMultiplexer _connection;
-    public PublishCustomer(IConfiguration configuration)
+    private readonly ILogger<Worker> _logger;
+    private readonly IConsumer _consumer;
+
+    public Worker(ILogger<Worker> logger, IConsumer consumer)
     {
-        _configuration = configuration;
-        _connection = ConnectionMultiplexer.Connect(configuration["Redis:ConnectionString"] ?? string.Empty);
+        _logger = logger;
+        _consumer = consumer;
     }
 
-    public async void PublishChannel(Customer customer) =>  await _connection.GetSubscriber().PublishAsync(_configuration["Redis:Chanel"] ?? string.Empty, $"Cliente cadastro com sucesso {customer.Name}", CommandFlags.HighPriority);
-
-}
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            _logger.LogInformation("Worker running at: {time}", DateTimeOffset.Now);
+            await _consumer.ConsumerChannel();
+            await Task.Delay(1000, stoppingToken);
+        }
+    }
 ```
-   Também não podemos nos esquecer de configurar no arquivo service, que será chamado pela controller todo nosso serviço do redis
+   E por ultimo vamos injetar nosso consumer no Program.cs
    
 ```C#
 
- public class CustomerService
- {
-    private readonly IRepository<Customer> _customerRepository;
-    private readonly IMapper _mapper;
-    private readonly ICachingService _cache;
-    private readonly IConfiguration _configuration;
-    private string _cacheKey = "customer_";
 
-    public CustomerService(IRepository<Customer> customerRepository, IMapper mapper, ICachingService cache, IConfiguration configuration)
+IHost host = Host.CreateDefaultBuilder(args)
+    .ConfigureServices(services =>
     {
-        _customerRepository = customerRepository;
-        _mapper = mapper;
-        _cache = cache;
-        _configuration = configuration;
-    }
+        services.AddHostedService<Worker>().AddSingleton<IConsumer, Consumer>();
+    })
+    .Build();
 
-    public async Task<CustomerDto> RegisterCustomer(CustomerDto customer)
-    {
-        var customerSave = await _customerRepository.Save(_mapper.Map<Customer>(customer));
-        await _cache.SetAsync(_cacheKey + customerSave, JsonSerializer.Serialize(customer));
-        new PublishCustomer(_configuration).PublishChannel(_mapper.Map<Customer>(customer));
-        return customer;
-    }
-
-    public async Task<CustomerDto?> GetCustomerDto(CustomerDto customer)
-    {
-        var customerCache = await _cache.GetAsync(_cacheKey + customer.Id);
-
-        if (customerCache != null)
-            return JsonSerializer.Deserialize<CustomerDto>(customerCache);
-        else
-        {
-            var result = await _customerRepository.Get(customer.Id);
-            if (result != null)
-            {
-                await _cache.SetAsync(_cacheKey + result.Id, JsonSerializer.Serialize(customer));
-                return _mapper.Map<CustomerDto>(result);
-            }
-        }
-        return null;
-    }
-
-    public async Task<List<CustomerDto>?> GetAllCustomers()
-    {
-        var customerCache = await _cache.GetAsync(_cacheKey + "all");
-
-        if (customerCache != null)
-            return JsonSerializer.Deserialize<List<CustomerDto>>(customerCache);
-
-        var result = await _customerRepository.GetAll();
-
-        if (result != null)
-        {
-            await _cache.SetAsync(_cacheKey + "all", JsonSerializer.Serialize(result));
-            return _mapper.Map<List<CustomerDto>>(result.ToList());
-        }
-
-        return null;
-    }
-
-    public async Task EditCustomer(CustomerDto customer) => await _customerRepository.Edit(_mapper.Map<Customer>(customer));
-
-    public async Task DeleteCustomer(CustomerDto customer) => await _customerRepository.Delete(customer.Id);
- }
+host.Run();
 ```
    
-Agora vamos configurar nossa controller
-   
-````C#
-[Route("api/[controller]")]
-[ApiController]
-public class CustomerController : ControllerBase
-{
-    private CustomerService _customerService;
 
-    public CustomerController(IRepository<Customer> repositoryCustomer, IMapper mapper, ICachingService cache, IConfiguration configuration)
-    {
-        _customerService = new CustomerService(repositoryCustomer, mapper, cache, configuration);        
-    }
-
-    [HttpGet]
-    public async Task<IActionResult> Get()
-    {
-        return Ok(await _customerService.GetAllCustomers());
-    }
-
-    // GET api/<ValuesController>/5
-    [HttpGet("{id}")]
-    public async Task<IActionResult> Get(Guid id)
-    {
-        return Ok(await _customerService.GetCustomerDto(new CustomerDto() { Id = id }));
-    }
-
-    // POST api/<ValuesController>
-    [HttpPost]
-    public async Task<IActionResult> Post([FromBody] CustomerDto customer)
-    {
-        return Ok(await _customerService.RegisterCustomer(customer));
-    }
-
-    // PUT api/<ValuesController>/5
-    [HttpPut("{id}")]
-    public async Task<IActionResult> Put([FromBody] CustomerDto value)
-    {
-        await _customerService.EditCustomer(value);
-        return Ok("Edited");
-    }
-
-    // DELETE api/<ValuesController>/5
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(Guid id)
-    {
-        await _customerService.DeleteCustomer(new CustomerDto() { Id = id });
-        return Ok("Deleted");
-    }
-}
-
-````
-
-Por ultimo vamos criar um projeto console em .net 7 e implementar a parte de ouvir o canal e sempre que alguém colocar alguma coisa nele, nosso projeto reproduzir a informação e manipular como bem entender
-   
-Program.cs   
-````C#
-
-using StackExchange.Redis;
-
-string RedisConnectionString = "localhost:6379";
-
-ConnectionMultiplexer connection = ConnectionMultiplexer.Connect(RedisConnectionString);
-
-string Channel = "customer-redis";
-
-Console.WriteLine("Ouvindo o canal");
-
-connection.GetSubscriber().Subscribe(Channel, (channel, message) => Console.WriteLine("Usuario recebido no canal mensagem: " + message));
-
-Console.ReadLine();
-
-````
+### <h5> Agora Dev basta apenas executar o Docker e seus projetos, espero que eu tenha ajudado, nos vemos por aí
    
    
 ### <h5> [IDE Utilizada]</h5>
-![VisualStudio](https://img.shields.io/badge/Visual_Studio_2019-000000?style=for-the-badge&logo=visual%20studio&logoColor=purple)
+![VisualStudio](https://img.shields.io/badge/Visual_Studio_2022-000000?style=for-the-badge&logo=visual%20studio&logoColor=purple)
 
 ### <h5> [Linguagem Programação Utilizada]</h5>
 ![C#](https://img.shields.io/badge/C%23-000000?style=for-the-badge&logo=c-sharp&logoColor=purple)
